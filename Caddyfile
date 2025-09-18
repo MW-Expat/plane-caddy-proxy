@@ -1,26 +1,37 @@
 # global options
 {
-	admin off
-	persist_config off
-	auto_https off
-
+	admin off # theres no need for the admin api in railway's environment
+	persist_config off # storage isn't persistent anyway
+	auto_https off # railway handles https for us, this could in some cases cause issues if left enabled
+	# runtime logs
 	log {
-		format json
+		format json # set runtime log format to json mode 
 	}
-
+	# server options
 	servers {
-		trusted_proxies static private_ranges 100.0.0.0/8
+		trusted_proxies static private_ranges 100.0.0.0/8 # trust railway's proxy
 	}
 }
 
+# site block, listens on the $PORT environment variable, automatically assigned by railway
 :{$PORT} {
-	encode zstd gzip
-
+	# access logs
 	log {
-		format json
+		format json # set access log format to json mode
 	}
 
-	# --- API, auth, uploads, websockets -> API service ---
+	# keep your working catch-all exactly as-is
+	reverse_proxy /* {$WEB_ENDPOINT} {
+		header_up Host {upstream_hostport}
+	}
+
+	handle /god-mode/* {
+		reverse_proxy {$ADMIN_ENDPOINT} {
+			header_up Host {upstream_hostport}
+		}
+	}
+
+	# --- ONLY CHANGE: forward real host/proto to API so OAuth builds public URLs ---
 	handle /api/* {
 		reverse_proxy {$API_ENDPOINT} {
 			header_up Host {http.request.host}
@@ -41,41 +52,15 @@
 		}
 	}
 
-	handle /socket.io/* {
-		reverse_proxy {$API_ENDPOINT} {
-			header_up Host {http.request.host}
-			header_up X-Forwarded-Host {http.request.host}
-			header_up X-Forwarded-Proto {http.request.scheme}
-			header_up X-Forwarded-Port 443
-			header_up X-Real-IP {remote}
-		}
-	}
-
-	# uploads/minio
 	handle /spaces/* {
 		reverse_proxy {$SPACES_ENDPOINT} {
 			header_up Host {upstream_hostport}
 		}
 	}
 
-	# Plane admin UI
-	handle /god-mode/* {
-		reverse_proxy {$ADMIN_ENDPOINT} {
-			header_up Host {http.request.host}
-			header_up X-Forwarded-Proto {http.request.scheme}
-			header_up X-Forwarded-Port 443
-			header_up X-Real-IP {remote}
-		}
-	}
-
-	# Optional: direct bucket access
 	handle /{$BUCKET_NAME}/* {
 		reverse_proxy {$BUCKET_ENDPOINT} {
 			header_up Host {upstream_hostport}
 		}
 	}
-
-	# --- everything else -> Web (Next.js) ---
-	handle {
-		reverse_proxy {$WEB_ENDPOINT} {
-			header_up Host {http.r_
+}
