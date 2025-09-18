@@ -1,56 +1,94 @@
 # global options
 {
-	admin off # theres no need for the admin api in railway's environment
-	persist_config off # storage isn't persistent anyway
-	auto_https off # railway handles https for us, this could in some cases cause issues if left enabled
-	# runtime logs
+	admin off
+	persist_config off
+	auto_https off
+
 	log {
-		format json # set runtime log format to json mode 
+		format json
 	}
-	# server options
+
 	servers {
-		trusted_proxies static private_ranges 100.0.0.0/8 # trust railway's proxy
+		# trust Railway's proxy and private ranges
+		trusted_proxies static private_ranges 100.0.0.0/8
 	}
 }
 
-# site block, listens on the $PORT environment variable, automatically assigned by railway
+# site block (Railway sets $PORT)
 :{$PORT} {
+	encode zstd gzip
+
 	# access logs
 	log {
-		format json # set access log format to json mode
+		format json
 	}
 
-	reverse_proxy /* {$WEB_ENDPOINT} {
-		header_up Host {upstream_hostport}
-	}
-
-	handle /god-mode/* {
-		reverse_proxy {$ADMIN_ENDPOINT} {
-			header_up Host {upstream_hostport}
-		}
-	}
-
-	handle /api/* {
+	# --- API, auth, uploads, websockets -> API service ---
+	handle_path /api/* {
 		reverse_proxy {$API_ENDPOINT} {
-			header_up Host {upstream_hostport}
+			# make Django/Plane see the real public host & https
+			header_up Host {http.request.host}
+			header_up X-Forwarded-Host {http.request.host}
+			header_up X-Forwarded-Proto {http.request.scheme}
+			header_up X-Forwarded-Port 443
+			header_up X-Real-IP {remote}
 		}
 	}
 
-	handle /auth/* {
+	handle_path /auth/* {
 		reverse_proxy {$API_ENDPOINT} {
-			header_up Host {upstream_hostport}
+			header_up Host {http.request.host}
+			header_up X-Forwarded-Host {http.request.host}
+			header_up X-Forwarded-Proto {http.request.scheme}
+			header_up X-Forwarded-Port 443
+			header_up X-Real-IP {remote}
 		}
 	}
 
-	handle /spaces/* {
+	# Plane uses /spaces for uploads; keep it as a separate upstream if you have MinIO
+	handle_path /spaces/* {
 		reverse_proxy {$SPACES_ENDPOINT} {
+			# for object storage, upstream Host is fine
 			header_up Host {upstream_hostport}
 		}
 	}
 
-	handle /{$BUCKET_NAME}/* {
+	# If your build uses socket.io for realtime:
+	handle_path /socket.io/* {
+		reverse_proxy {$API_ENDPOINT} {
+			header_up Host {http.request.host}
+			header_up X-Forwarded-Host {http.request.host}
+			header_up X-Forwarded-Proto {http.request.scheme}
+			header_up X-Forwarded-Port 443
+			header_up X-Real-IP {remote}
+		}
+	}
+
+	# Plane admin UI
+	handle_path /god-mode/* {
+		reverse_proxy {$ADMIN_ENDPOINT} {
+			header_up Host {http.request.host}
+			header_up X-Forwarded-Proto {http.request.scheme}
+			header_up X-Forwarded-Port 443
+			header_up X-Real-IP {remote}
+		}
+	}
+
+	# Optional: direct bucket access (keep upstream host)
+	handle_path /{$BUCKET_NAME}/* {
 		reverse_proxy {$BUCKET_ENDPOINT} {
 			header_up Host {upstream_hostport}
+		}
+	}
+
+	# --- everything else -> Web (Next.js) ---
+	handle {
+		reverse_proxy {$WEB_ENDPOINT} {
+			# usually safe to keep original host for the web app too
+			header_up Host {http.request.host}
+			header_up X-Forwarded-Proto {http.request.scheme}
+			header_up X-Forwarded-Port 443
+			header_up X-Real-IP {remote}
 		}
 	}
 }
