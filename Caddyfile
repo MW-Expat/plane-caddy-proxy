@@ -33,22 +33,22 @@
 
 	# --- ONLY CHANGE: forward real host/proto to API so OAuth builds public URLs ---
 	handle /api/* {
-		reverse_proxy {$API_ENDPOINT} {
-			header_up Host {http.request.host}
-			header_up X-Forwarded-Host {http.request.host}
-			header_up X-Forwarded-Proto {http.request.scheme}
-			header_up X-Forwarded-Port 443
-			header_up X-Real-IP {remote}
+		reverse_proxy http://api:8000 {
+		  header_up Host {http.request.host}
+		  header_up X-Forwarded-Host {http.request.host}
+		  header_up X-Forwarded-Proto {http.request.scheme}
+		  header_up X-Forwarded-Port 443
+		  header_up X-Real-IP {remote}
 		}
 	}
-
+	
 	handle /auth/* {
-		reverse_proxy {$API_ENDPOINT} {
-			header_up Host {http.request.host}
-			header_up X-Forwarded-Host {http.request.host}
-			header_up X-Forwarded-Proto {http.request.scheme}
-			header_up X-Forwarded-Port 443
-			header_up X-Real-IP {remote}
+		reverse_proxy http://api:8000 {
+		  header_up Host {http.request.host}
+		  header_up X-Forwarded-Host {http.request.host}
+		  header_up X-Forwarded-Proto {http.request.scheme}
+		  header_up X-Forwarded-Port 443
+		  header_up X-Real-IP {remote}
 		}
 	}
 
