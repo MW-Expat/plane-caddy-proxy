@@ -46,7 +46,7 @@
 	    }
 	  }
 	}
-
+	
 	handle /auth/* {
 	  reverse_proxy {$API_ENDPOINT} {
 	    header_up Host {http.request.host}
