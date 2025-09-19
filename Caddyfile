@@ -33,7 +33,7 @@
 
 	# --- ONLY CHANGE: forward real host/proto to API so OAuth builds public URLs ---
 	handle /api/* {
-	  reverse_proxy {$API_ENDPOINT} {
+	  reverse_proxy https://api-production-cd78.up.railway.app {
 	    header_up Host {http.request.host}
 	    header_up X-Forwarded-Host {http.request.host}
 	    header_up X-Forwarded-Proto {http.request.scheme}
@@ -43,7 +43,7 @@
 	}
 	
 	handle /auth/* {
-	  reverse_proxy {$API_ENDPOINT} {
+	  reverse_proxy https://api-production-cd78.up.railway.app {
 	    header_up Host {http.request.host}
 	    header_up X-Forwarded-Host {http.request.host}
 	    header_up X-Forwarded-Proto {http.request.scheme}
